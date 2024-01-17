@@ -376,8 +376,25 @@ class LeafNode extends BPlusNode {
         // Note: LeafNode has two constructors. To implement fromBytes be sure to
         // use the constructor that reuses an existing page instead of fetching a
         // brand new one.
+        Page page = bufferManager.fetchPage(treeContext, pageNum);
+        Buffer buf = page.getBuffer();
 
-        return null;
+        byte nodeType = buf.get();
+        assert(nodeType == (byte) 1);
+
+        long pageid = buf.getLong();
+        int numpairs = buf.getInt();
+        List<DataBox> keys = new ArrayList<>();
+        List<RecordId> rids = new ArrayList<>();
+        for (int i = 0;i<numpairs;i++){
+            DataBox key = DataBox.fromBytes(buf, metadata.getKeySchema());
+            RecordId rid = RecordId.fromBytes(buf);
+            keys.add(key);
+            rids.add(rid);
+        }
+
+
+        return new LeafNode(metadata, bufferManager, page, keys, rids,Optional.of(Long.valueOf(pageid)) ,treeContext);
     }
 
     // Builtins ////////////////////////////////////////////////////////////////
