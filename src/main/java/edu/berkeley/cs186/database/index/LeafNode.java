@@ -154,9 +154,9 @@ class LeafNode extends BPlusNode {
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
-        // TODO(proj2): implement
+        // proj2: implement
 
-        return null;
+        return this;
     }
 
     // See BPlusNode.put.
