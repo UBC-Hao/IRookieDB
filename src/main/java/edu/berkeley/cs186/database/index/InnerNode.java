@@ -105,9 +105,43 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        // TODO(proj2): implement
+        // proj2: implement
+        int index = 0;
+        for (int i = 0; i< this.keys.size(); i++){
+            DataBox toComp = this.keys.get(i);
+            if (key.compareTo(toComp) >= 0){ // key < toCmp = keys[i] = keys[index]
+                index += 1;
+            }else{
+                break;
+            }
+        }
+        //     keys[index-1] <= key < keys [index]
+        BPlusNode nextNode =  BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(index));
+        Optional<Pair<DataBox, Long>> pair =  nextNode.put(key, rid);
 
-        return Optional.empty();
+        if (!pair.isPresent()) return Optional.empty();
+        DataBox inKey = pair.get().getFirst();
+        long inpage = pair.get().getSecond();
+        // we have a new node to insert
+        this.keys.add(index, inKey);
+        this.children.add(index+1, inpage);
+        // checks if overflow
+        int d = this.metadata.getOrder();
+        if (this.keys.size() <= 2 * d){
+            sync();
+            return Optional.empty();
+        }
+        List<DataBox> keys1 = this.keys.subList(0, d);
+        DataBox keypush = keys.get(d);
+        List<DataBox> keys2 = this.keys.subList(d+1, 2*d+1);
+        List<Long> c1 = this.children.subList(0,d+1);
+        assert(c1.size()  == keys1.size() + 1);
+        List<Long> c2 = this.children.subList(d+1, 2*d+2);
+        this.keys = keys1;
+        this.children = c1;
+        InnerNode newNode = new InnerNode(metadata, bufferManager, keys2, c2, treeContext);
+        sync();
+        return Optional.of(new Pair<DataBox,Long>(keypush,newNode.page.getPageNum()));
     }
 
     // See BPlusNode.bulkLoad.

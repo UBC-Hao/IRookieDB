@@ -11,6 +11,7 @@ import edu.berkeley.cs186.database.io.DiskSpaceManager;
 import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.table.RecordId;
 
+import javax.xml.crypto.Data;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -253,12 +254,22 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): implement
+        // proj2: implement
         // Note: You should NOT update the root variable directly.
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
-        return;
+        Optional<Pair<DataBox, Long>> ret = this.root.put(key, rid);
+        if (!ret.isPresent()) return;
+        DataBox newKey = ret.get().getFirst();
+        long pageNum = ret.get().getSecond();
+        ArrayList<DataBox> keys = new ArrayList<>();
+        keys.add(newKey);
+        ArrayList<Long> childs = new ArrayList<>();
+        childs.add(this.root.getPage().getPageNum());
+        childs.add(pageNum);
+        InnerNode innerNode = new InnerNode(metadata, bufferManager, keys, childs, lockContext);
+        this.updateRoot(innerNode);
     }
 
     /**
