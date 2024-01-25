@@ -126,6 +126,10 @@ class InnerNode extends BPlusNode {
         this.keys.add(index, inKey);
         this.children.add(index+1, inpage);
         // checks if overflow
+        return trySplitNode();
+    }
+
+    private Optional<Pair<DataBox, Long>> trySplitNode(){
         int d = this.metadata.getOrder();
         if (this.keys.size() <= 2 * d){
             sync();
@@ -148,9 +152,19 @@ class InnerNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
-        // TODO(proj2): implement
+        //proj2: implement
 
-        return Optional.empty();
+        BPlusNode bnode = getChild(children.size() -1);
+        Optional<Pair<DataBox, Long>> pair = bnode.bulkLoad(data, fillFactor);
+        if (!pair.isPresent()) {
+            //empty
+            return Optional.empty();
+        }else{
+            //new node join
+            this.keys.add(pair.get().getFirst());
+            this.children.add(pair.get().getSecond());
+            return trySplitNode();
+        }
     }
 
     // See BPlusNode.remove.

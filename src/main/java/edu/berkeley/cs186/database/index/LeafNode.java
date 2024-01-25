@@ -9,6 +9,7 @@ import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.table.RecordId;
 
+import javax.swing.text.html.Option;
 import java.nio.ByteBuffer;
 import java.util.*;
 
@@ -201,8 +202,27 @@ class LeafNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
-        // TODO(proj2): implement
+        // proj2: implement
+        int maxNums = (int)Math.ceil(fillFactor * (2 * this.metadata.getOrder()));
+        while (data.hasNext() && keys.size() < maxNums){
+            Pair<DataBox,RecordId> pair = data.next();
+            keys.add(pair.getFirst());
+            rids.add(pair.getSecond());
+        }
+        if (data.hasNext()){
+            // we need to create new sibling
+            Pair<DataBox,RecordId> pair = data.next();
+            List<DataBox> keysnew = new ArrayList<>();
+            List<RecordId> ridsnew = new ArrayList<>();
+            keysnew.add(pair.getFirst());
+            ridsnew.add(pair.getSecond());
 
+            LeafNode sib = new LeafNode(metadata,bufferManager,keysnew,ridsnew, Optional.of((long)-1), treeContext);
+            this.rightSibling = Optional.of(sib.getPage().getPageNum());
+            sync();
+            return Optional.of(new Pair<DataBox, Long>(pair.getFirst(), sib.getPage().getPageNum()));
+        }
+        sync();
         return Optional.empty();
     }
 

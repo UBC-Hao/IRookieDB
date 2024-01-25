@@ -8,6 +8,7 @@ import edu.berkeley.cs186.database.concurrency.LockUtil;
 import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.databox.Type;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
+import edu.berkeley.cs186.database.io.PageException;
 import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.table.RecordId;
 
@@ -202,9 +203,9 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): Return a BPlusTreeIterator.
+        // proj2: Return a BPlusTreeIterator.
 
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator(root.getLeftmostLeaf());
     }
 
     /**
@@ -235,9 +236,10 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): Return a BPlusTreeIterator.
+        // proj2: Return a BPlusTreeIterator.
+        LeafNode leaf = this.root.get(key);
 
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator(leaf, key);
     }
 
     /**
@@ -260,6 +262,10 @@ public class BPlusTree {
         // the tree's root if the old root splits.
 
         Optional<Pair<DataBox, Long>> ret = this.root.put(key, rid);
+        tryChangeRoot(ret);
+    }
+
+    private void tryChangeRoot(Optional<Pair<DataBox, Long>> ret){
         if (!ret.isPresent()) return;
         DataBox newKey = ret.get().getFirst();
         long pageNum = ret.get().getSecond();
@@ -295,11 +301,14 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): implement
+        // proj2: implement
         // Note: You should NOT update the root variable directly.
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
-
+        while(data.hasNext()){
+            Optional<Pair<DataBox, Long>> ret = this.root.bulkLoad(data, fillFactor);
+            tryChangeRoot(ret);
+        }
         return;
     }
 
@@ -433,20 +442,48 @@ public class BPlusTree {
 
     // Iterator ////////////////////////////////////////////////////////////////
     private class BPlusTreeIterator implements Iterator<RecordId> {
-        // TODO(proj2): Add whatever fields and constructors you want here.
+        // proj2: Add whatever fields and constructors you want here.
+        private LeafNode node;
+        private int k;
+        private BPlusTreeIterator(LeafNode leftMost){
+            node = leftMost;
+            k = 0;
+        }
+
+        private BPlusTreeIterator(LeafNode leftMost, DataBox key){
+            node = leftMost;
+            // find the first k
+            k = InnerNode.numLessThan(key, node.getKeys());
+            grow();
+        }
+
+        private void grow(){
+            if (k == node.getRids().size()){
+                k = 0;
+                try {
+                    Optional<LeafNode> nxt = node.getRightSibling();
+                    node = nxt.orElse(null);
+                }catch(PageException e){
+                    node = null;
+                }
+            }
+        }
 
         @Override
         public boolean hasNext() {
-            // TODO(proj2): implement
-
-            return false;
+            return node != null && k < node.getRids().size();
         }
 
         @Override
         public RecordId next() {
-            // TODO(proj2): implement
+            if (!hasNext()){
+                throw new NoSuchElementException();
+            }
 
-            throw new NoSuchElementException();
+            RecordId ret = node.getRids().get(k);
+            k ++;
+            grow();
+            return ret;
         }
     }
 }
