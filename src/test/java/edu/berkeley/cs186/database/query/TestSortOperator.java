@@ -290,7 +290,7 @@ public class TestSortOperator {
 
             // Create 1 run with 3 pages of records
             Run sortedRun = s.sort();
-            checkIOs(3 + NEW_RUN_IOS);
+            checkIOs(3 + NEW_RUN_IOS );
 
             Iterator<Record> iter = sortedRun.iterator();
             int i = 0;
