@@ -139,8 +139,54 @@ public class SortMergeOperator extends JoinOperator {
          * or null if there are no more records to join.
          */
         private Record fetchNextRecord() {
-            // TODO(proj3_part1): implement
-            return null;
+            // proj3_part1: implement
+            if (leftRecord == null) {
+                return null;
+            }
+            while(true){
+                if (!marked){
+                    if (rightRecord == null) return null;
+                    while(compare(leftRecord, rightRecord) < 0){
+                        if (leftIterator.hasNext())
+                            leftRecord = leftIterator.next();
+                        else{
+                            leftRecord = null;
+                            return null;
+                        }
+                    }
+                    while(compare(leftRecord, rightRecord) > 0){
+                        if (rightIterator.hasNext())
+                            rightRecord = rightIterator.next();
+                        else{
+                            leftRecord = null;
+                            return null;
+                        }
+                    }
+                    rightIterator.markPrev();
+                    marked = true;
+                }
+
+                if (rightRecord != null && compare(leftRecord, rightRecord) == 0){
+                    Record ret = leftRecord.concat(rightRecord);
+                    if (rightIterator.hasNext())
+                        rightRecord = rightIterator.next();
+                    else {
+                        rightRecord = null;
+                    }
+                    return ret;
+                }else{
+                    rightIterator.reset();
+                    rightRecord = rightIterator.next();
+                    if (leftIterator.hasNext())
+                        leftRecord = leftIterator.next();
+                    else{
+                        leftRecord = null;
+                        return null;
+                    }
+                    marked = false;
+                }
+            }
+           // return null;
         }
 
         @Override
