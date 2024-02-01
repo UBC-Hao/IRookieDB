@@ -727,7 +727,7 @@ public class QueryPlan {
      */
     public Iterator<Record> execute() {
         this.transaction.setAliasMap(this.aliases);
-        // TODO(proj3_part2): implement
+        // proj3_part2: implement
         // Pass 1: For each table, find the lowest cost QueryOperator to access
         // the table. Construct a mapping of each table name to its lowest cost
         // operator.
@@ -739,7 +739,31 @@ public class QueryPlan {
         // Set the final operator to the lowest cost operator from the last
         // pass, add group by, project, sort and limit operators, and return an
         // iterator over the final operator.
-        return this.executeNaive(); // TODO(proj3_part2): Replace this!
+        //return this.executeNaive();
+
+        Map<Set<String>, QueryOperator> map = new HashMap<>();
+        // pass 1
+        for (String name : tableNames){
+            Set<String> newset = new HashSet<>();
+            newset.add(name);
+            QueryOperator op = minCostSingleAccess(name);
+            map.put(newset, op);
+        }
+
+        Map<Set<String>, QueryOperator> mapprev = new HashMap<>(map);
+        // pass i
+        int len = tableNames.size();
+        for (int i = 2; i <= len ; i++){
+            //pass i
+            mapprev = minCostJoins(mapprev, map);
+        }
+        QueryOperator minOp = minCostOperator(mapprev);
+        this.finalOperator = minOp;
+        this.addGroupBy();
+        this.addProject();
+        this.addSort();
+        this.addLimit();
+        return this.finalOperator.iterator();
     }
 
     // EXECUTE NAIVE ///////////////////////////////////////////////////////////
