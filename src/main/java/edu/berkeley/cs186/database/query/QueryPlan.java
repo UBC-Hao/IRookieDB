@@ -645,7 +645,7 @@ public class QueryPlan {
             Map<Set<String>, QueryOperator> prevMap,
             Map<Set<String>, QueryOperator> pass1Map) {
         Map<Set<String>, QueryOperator> result = new HashMap<>();
-        // TODO(proj3_part2): implement
+        // proj3_part2: implement
         // We provide a basic description of the logic you have to implement:
         // For each set of tables in prevMap
         //   For each join predicate listed in this.joinPredicates
@@ -661,6 +661,35 @@ public class QueryPlan {
         //      calculate the cheapest join with the new table (the one you
         //      fetched an operator for from pass1Map) and the previously joined
         //      tables. Then, update the result map if needed.
+        for (Set<String> tables : prevMap.keySet()){
+            for (JoinPredicate predicate : this.joinPredicates){
+                String lc  = predicate.leftTable;
+                String rc = predicate.rightTable;
+                if (tables.contains(lc) && tables.contains(rc)) continue;
+                if (tables.contains(lc)==false && tables.contains(rc)==false) continue;
+                String toget = lc; // toget is not in tables
+                String jright = predicate.leftColumn;
+                String jleft = predicate.rightColumn;
+                if (tables.contains(lc)) { // but not right
+                    toget = rc;
+                    jright = predicate.rightColumn;
+                    jleft = predicate.leftColumn;
+                }
+                Set<String> toGet = new HashSet<String>();
+                toGet.add(toget);
+                QueryOperator op = pass1Map.get(toGet);
+                op = minCostJoinType(prevMap.get(tables), op, jleft, jright);
+                toGet.addAll(tables);
+                if (result.containsKey(toGet)){
+                    QueryOperator cmp = result.get(toGet);
+                    if (cmp.estimateIOCost() > op.estimateIOCost()){
+                        result.put(toGet, op);
+                    }
+                }else{
+                    result.put(toGet, op);
+                }
+            }
+        }
         return result;
     }
 
