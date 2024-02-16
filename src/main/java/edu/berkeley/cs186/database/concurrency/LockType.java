@@ -115,8 +115,72 @@ public enum LockType {
         if (parentLockType == null || childLockType == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+        // proj4_part1: implement
+        if (parentLockType == IS){
+            switch (childLockType){
+                case S:
+                    return true;
+                case IS:
+                    return true;
+                case NL:
+                    return true;
+                default:
+                    return false;
+            }
+        }
 
+        if (parentLockType == S){
+            switch (childLockType){
+                case S:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        if (parentLockType == X){
+            switch (childLockType){
+                case X:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        if (parentLockType == IX){
+            switch (childLockType){
+                case X:
+                    return true;
+                case NL:
+                    return true;
+                case IX:
+                    return true;
+                case SIX:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        if (parentLockType == SIX){
+            switch (childLockType){
+                case SIX:
+                    return true;
+                case X:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        if (parentLockType == NL){
+            switch (childLockType){
+                case NL:
+                    return true;
+                default:
+                    return false;
+            }
+        }
         return false;
     }
 
