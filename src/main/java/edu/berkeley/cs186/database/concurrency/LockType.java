@@ -11,6 +11,7 @@ public enum LockType {
     SIX, // shared intention exclusive
     NL;  // no lock held
 
+
     /**
      * This method checks whether lock types A and B are compatible with
      * each other. If a transaction can hold lock type A on a resource
@@ -21,7 +22,68 @@ public enum LockType {
         if (a == null || b == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+        // proj4_part1: implement
+        if (a == NL || b == NL) return true;
+
+        if (a == S){
+            switch (b){
+                    case S:
+                        return true;
+                    case IS:
+                        return true;
+                    default:
+                        return false;
+            }
+        }
+
+        if (a == IX){
+            switch(b){
+                case S:
+                    return false;
+                case X:
+                    return false;
+                case IS:
+                    return true;
+                case IX:
+                    return true;
+                case SIX:
+                    return false;
+            }
+        }
+
+        if (a == SIX){
+            switch(b){
+                case S:
+                    return false;
+                case X:
+                    return false;
+                case IS:
+                    return true;
+                case IX:
+                    return false;
+                case SIX:
+                    return false;
+            }
+        }
+
+        if (a==X){
+            return false;
+        }
+
+        if (a==IS){
+            switch (b){
+                case S:
+                    return true;
+                case IS:
+                    return true;
+                case IX:
+                    return true;
+                case SIX:
+                    return true;
+                default:
+                    return false;
+            }
+        }
 
         return false;
     }
