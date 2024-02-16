@@ -133,6 +133,8 @@ public enum LockType {
             switch (childLockType){
                 case S:
                     return true;
+                case NL:
+                    return true;
                 default:
                     return false;
             }
@@ -142,6 +144,8 @@ public enum LockType {
             switch (childLockType){
                 case X:
                     return true;
+                case NL:
+                    return true;
                 default:
                     return false;
             }
@@ -149,6 +153,8 @@ public enum LockType {
 
         if (parentLockType == IX){
             switch (childLockType){
+                case S:
+                    return true;
                 case X:
                     return true;
                 case NL:
@@ -157,6 +163,8 @@ public enum LockType {
                     return true;
                 case SIX:
                     return true;
+                case IS:
+                    return true;
                 default:
                     return false;
             }
@@ -164,9 +172,10 @@ public enum LockType {
 
         if (parentLockType == SIX){
             switch (childLockType){
-                case SIX:
-                    return true;
+
                 case X:
+                    return true;
+                case NL:
                     return true;
                 default:
                     return false;
@@ -194,8 +203,56 @@ public enum LockType {
         if (required == null || substitute == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
-
+        // proj4_part1: implement
+        if (required == NL) return true;
+        if (required == S){
+            switch (substitute){
+                case IS:
+                    return false;
+                case NL:
+                    return false;
+                case IX:
+                    return false;
+                default:
+                    return true;
+            }
+        }
+        if (required == X){
+            switch (substitute){
+                case X:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        if (required == IS){
+            switch (substitute){
+                case S:
+                case X:
+                case IS:
+                case IX:
+                case SIX:
+                    return true;
+            }
+            return false;
+        }
+        if (required == IX){
+            switch (substitute){
+                case X:
+                case IX:
+                case SIX:
+                    return true;
+            }
+            return false;
+        }
+        if (required == SIX){
+            switch (substitute){
+                case X:
+                case SIX:
+                    return true;
+            }
+            return false;
+        }
         return false;
     }
 
