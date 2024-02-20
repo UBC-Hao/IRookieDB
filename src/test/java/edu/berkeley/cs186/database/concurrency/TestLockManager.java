@@ -42,9 +42,9 @@ public class TestLockManager {
         if (locks == null) {
             return false;
         }
-        System.out.println(locks.size());
+        //System.out.println(locks.size());
         for (Lock lock : locks) {
-            System.out.println(lock);
+         //   System.out.println(lock);
             if (lock.name == name && lock.lockType == type) {
                 return true;
             }
