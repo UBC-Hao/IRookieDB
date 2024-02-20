@@ -263,6 +263,13 @@ public enum LockType {
         return this == LockType.IX || this == LockType.IS || this == LockType.SIX;
     }
 
+
+    public LockType toIntent(){
+        if (this==LockType.X) return LockType.IX;
+        else if (this==LockType.S) return LockType.IS;
+        return LockType.NL;
+    }
+
     @Override
     public String toString() {
         switch (this) {

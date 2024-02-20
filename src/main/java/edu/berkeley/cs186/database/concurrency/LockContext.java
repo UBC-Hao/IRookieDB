@@ -169,6 +169,7 @@ public class LockContext {
 
         if (newLockType == LockType.SIX) {
             List<ResourceName> list = sisDescendants(transaction, LockType.S, LockType.IS);
+            list.add(this.name);
             this.updateDesCnt(transaction, LockType.S, LockType.IS);
             lockman.acquireAndRelease(transaction, this.name, newLockType, list);
         }else{
@@ -216,7 +217,8 @@ public class LockContext {
         if (getExplicitLockType(transaction)==LockType.NL) throw new NoLockHeldException("");
         updateDesCnt(transaction, null, null);
         List<ResourceName> list = sisDescendants(transaction, null,null);
-        if (list.size() == 0) {
+        list.add(this.name);
+        if (list.size() == 1) {
             if (getEffectiveLockType(transaction) == LockType.IS || getEffectiveLockType(transaction) == LockType.NL) {
                 lockman.acquireAndRelease(transaction, this.name, LockType.S, list);
             }else if (getEffectiveLockType(transaction)!= LockType.S && getEffectiveLockType(transaction)!= LockType.X){
@@ -384,4 +386,5 @@ public class LockContext {
         return "LockContext(" + name.toString() + ")";
     }
 }
+
 
