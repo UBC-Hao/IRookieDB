@@ -927,10 +927,14 @@ public class Database implements AutoCloseable {
             return pair.getSecond().getHeight();
         }
 
+
+
         @Override
         public void close() {
             try {
-                // TODO(proj4_part2)
+                // Proj 4, close all locks
+                LockContext root = lockManager.databaseContext();
+                root.releaseAll(this);
                 return;
             } catch (Exception e) {
                 // There's a chance an error message from your release phase

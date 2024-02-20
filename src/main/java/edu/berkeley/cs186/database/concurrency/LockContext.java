@@ -319,6 +319,17 @@ public class LockContext {
         }
     }
 
+    public void releaseAll(TransactionContext context){
+        if (this.children.isEmpty()){
+            release(context);
+            return;
+        }
+        for (LockContext child : this.children.values()){
+            child.releaseAll(context);
+        }
+        release(context);
+    }
+
     private boolean onlySIS(TransactionContext transaction) {
         LockType ctype = lockman.getLockType(transaction, getResourceName());
         if (!(ctype == LockType.S || ctype == LockType.IS || ctype == LockType.NL)){

@@ -200,8 +200,8 @@ public class BPlusTree {
      * memory will receive 0 points.
      */
     public Iterator<RecordId> scanAll() {
-        // TODO(proj4_integration): Update the following line
-        LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
+        // proj4_integration: Update the following line
+        LockUtil.ensureSufficientLockHeld(lockContext, LockType.S);
 
         // proj2: Return a BPlusTreeIterator.
 
