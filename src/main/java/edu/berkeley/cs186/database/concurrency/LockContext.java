@@ -321,13 +321,13 @@ public class LockContext {
 
     public void releaseAll(TransactionContext context){
         if (this.children.isEmpty()){
-            release(context);
+            if (getExplicitLockType(context)!=LockType.NL) release(context);
             return;
         }
         for (LockContext child : this.children.values()){
             child.releaseAll(context);
         }
-        release(context);
+        if (getExplicitLockType(context)!=LockType.NL) release(context);
     }
 
     private boolean onlySIS(TransactionContext transaction) {

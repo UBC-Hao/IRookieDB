@@ -42,7 +42,7 @@ public class LockUtil {
         LockType explicitLockType = lockContext.getExplicitLockType(transaction);
 
         // proj4_part2: implement
-        if (LockType.substitutable(lockContext.getEffectiveLockType(transaction),requestType)) return;
+        if (explicitLockType == requestType ||  LockType.substitutable(lockContext.getEffectiveLockType(transaction),requestType)) return;
             //obtain intension lock on parent
         else if (requestType == LockType.S && explicitLockType == LockType.IX) {
             lockContext.promote(transaction, LockType.SIX);
@@ -67,14 +67,27 @@ public class LockUtil {
 
     private static void obtainAns(LockContext context, TransactionContext transaction, LockType request){
         if (LockType.substitutable(context.getExplicitLockType(transaction),request)) return;
+
+
+
         LockContext parentContext = context.parentContext();
         if (parentContext != null){
             obtainAns(parentContext, transaction, request);
         }
         if (context.getExplicitLockType(transaction)==LockType.NL)
             context.acquire(transaction, request);
-        else
+        else{
+            //System.out.println("Old: "+context.getExplicitLockType(transaction));
+            //System.out.println("New: "+request);
+            if (context.getExplicitLockType(transaction) == LockType.S){
+                //must be IX because not substitutable
+                //we need SIX
+                request = LockType.SIX;
+            }
+
             context.promote(transaction, request);
+
+        }
     }
 }
 
