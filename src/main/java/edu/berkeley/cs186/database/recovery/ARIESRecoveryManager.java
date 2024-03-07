@@ -416,7 +416,9 @@ public class ARIESRecoveryManager implements RecoveryManager {
         // All of the transaction's changes strictly after the record at LSN should be undone.
         long savepointLSN = transactionEntry.getSavepoint(name);
 
-        // TODO(proj5): implement
+        // proj5: implement
+        long lastLSN = rollbackToLSN(transNum, savepointLSN);
+        this.transactionTable.get(transNum).lastLSN = lastLSN;
         return;
     }
 
@@ -440,10 +442,41 @@ public class ARIESRecoveryManager implements RecoveryManager {
         LogRecord beginRecord = new BeginCheckpointLogRecord();
         long beginLSN = logManager.appendToLog(beginRecord);
 
-        Map<Long, Long> chkptDPT = new HashMap<>();
-        Map<Long, Pair<Transaction.Status, Long>> chkptTxnTable = new HashMap<>();
+        Map<Long, Long> chkptDPT = new HashMap<>(); // Dirty pages
+        Map<Long, Pair<Transaction.Status, Long>> chkptTxnTable = new HashMap<>(); // Transaction table
 
-        // TODO(proj5): generate end checkpoint record(s) for DPT and transaction table
+        // proj5: generate end checkpoint record(s) for DPT and transaction table
+        List<Long> dpt_page = new LinkedList<>(this.dirtyPageTable.keySet());
+        List<Long> trans = new LinkedList<>(this.transactionTable.keySet());
+        while(!EndCheckpointLogRecord.fitsInOneRecord(dpt_page.size(), trans.size())){
+            // Does not fit in one page, we create a new lists so it fits
+            List<Long> dpt_page2 = new LinkedList<>();
+            List<Long> trans2 = new LinkedList<>();
+            while(EndCheckpointLogRecord.fitsInOneRecord(dpt_page2.size(), trans2.size()) && !dpt_page.isEmpty()){
+                dpt_page2.add(dpt_page.remove(0)); // remove 0 is actually not efficient for arraylist
+            }
+            if (!EndCheckpointLogRecord.fitsInOneRecord(dpt_page2.size(), trans2.size())){
+                dpt_page.add(dpt_page2.remove(0));
+            } else if (dpt_page.isEmpty() && EndCheckpointLogRecord.fitsInOneRecord(dpt_page2.size(), trans2.size()) ){
+            while(EndCheckpointLogRecord.fitsInOneRecord(dpt_page2.size(), trans2.size()) && !trans.isEmpty()){
+                trans2.add(trans.remove(0)); // remove 0 is actually not efficient for arraylist
+            }
+                if (!EndCheckpointLogRecord.fitsInOneRecord(dpt_page2.size(), trans2.size())){
+                    trans.add(trans2.remove(0));
+                }
+            }
+
+            // create a record using dpt_page2 and trans2
+            Map<Long, Long> chkptDPT2 = new HashMap<>(); // Dirty pages
+            Map<Long, Pair<Transaction.Status, Long>> chkptTxnTable2 = new HashMap<>(); // Transaction table
+            for (Long num : dpt_page2) chkptDPT2.put(num, this.dirtyPageTable.get(num));
+            for (Long num : trans2) chkptTxnTable2.put(num, new Pair<>(this.transactionTable.get(num).transaction.getStatus(), this.transactionTable.get(num).lastLSN));
+            LogRecord endRecord2 = new EndCheckpointLogRecord(chkptDPT2, chkptTxnTable2);
+            logManager.appendToLog(endRecord2);
+        }
+
+        for (Long num : dpt_page) chkptDPT.put(num, this.dirtyPageTable.get(num));
+        for (Long num : trans) chkptTxnTable.put(num, new Pair<>(this.transactionTable.get(num).transaction.getStatus(), this.transactionTable.get(num).lastLSN));
 
         // Last end checkpoint record
         LogRecord endRecord = new EndCheckpointLogRecord(chkptDPT, chkptTxnTable);
@@ -504,6 +537,16 @@ public class ARIESRecoveryManager implements RecoveryManager {
         this.checkpoint();
     }
 
+
+    private void updateTransaction(Long transNum, Long lastLSN){
+        if (!transactionTable.containsKey(transNum)){
+            Transaction newTrans = newTransaction.apply(transNum);
+            TransactionTableEntry entry = new TransactionTableEntry(newTrans);
+            this.transactionTable.put(transNum, entry);
+        }
+        this.transactionTable.get(transNum).lastLSN = Math.max(this.transactionTable.get(transNum).lastLSN, lastLSN);
+    }
+
     /**
      * This method performs the analysis pass of restart recovery.
      *
@@ -555,7 +598,104 @@ public class ARIESRecoveryManager implements RecoveryManager {
         long LSN = masterRecord.lastCheckpointLSN;
         // Set of transactions that have completed
         Set<Long> endedTransactions = new HashSet<>();
-        // TODO(proj5): implement
+        // proj5: implement
+        // first, we reconstruct the table using checkpoints
+        Iterator<LogRecord> iter = logManager.scanFrom(LSN);
+        long transNumRecord = -1;
+        while(iter.hasNext()){
+            LogRecord nextRecord = iter.next();
+            transNumRecord = nextRecord.getTransNum().orElse(new Long(-1));
+            if (transNumRecord != -1){
+                updateTransaction(transNumRecord, nextRecord.LSN);
+            }
+            switch (nextRecord.getType()){
+                case BEGIN_CHECKPOINT:
+                    //do nothing
+                    break;
+                case END_CHECKPOINT:
+                    record = (EndCheckpointLogRecord)nextRecord;
+                    Map<Long, Pair<Transaction.Status, Long>> trans = record.getTransactionTable();
+                    Map<Long, Long> dp = record.getDirtyPageTable();
+                    for(Long transNum : trans.keySet()){
+                        if (endedTransactions.contains(transNum)) continue;
+                        Pair<Transaction.Status, Long> pair = trans.get(transNum);
+                        if (this.transactionTable.containsKey(transNum)){
+                            Transaction.Status statusBefore = this.transactionTable.get(transNum).transaction.getStatus();
+                            if (statusBefore.compareTo(pair.getFirst()) < 0){
+                                Transaction.Status newStatus = pair.getFirst();
+                                if (newStatus== Transaction.Status.ABORTING){
+                                    newStatus = Transaction.Status.RECOVERY_ABORTING;
+                                }
+                                this.transactionTable.get(transNum).transaction.setStatus(newStatus);
+                            }
+
+                            this.transactionTable.get(transNum).lastLSN = Math.max(pair.getSecond(),this.transactionTable.get(transNum).lastLSN);
+                        }else{
+                            Transaction newTrans = newTransaction.apply(transNum);
+
+                                Transaction.Status newStatus = pair.getFirst();
+                                if (newStatus== Transaction.Status.ABORTING){
+                                    newStatus = Transaction.Status.RECOVERY_ABORTING;
+                                }
+                                newTrans.setStatus(newStatus);
+
+                            TransactionTableEntry entry = new TransactionTableEntry(newTrans);
+                            entry.lastLSN = pair.getSecond();
+                            this.transactionTable.put(transNum, entry);
+                        }
+                    }
+                    for(Long pageNum : dp.keySet()){
+                        Long lsnPage = dp.get(pageNum);
+                        dirtyPage(pageNum, lsnPage);
+                    }
+                    break;
+                case UPDATE_PAGE:
+                case UNDO_UPDATE_PAGE:
+                    dirtyPage(nextRecord.getPageNum().get(), nextRecord.LSN);
+                    break;
+                case FREE_PAGE:
+                case UNDO_ALLOC_PAGE:
+                    this.dirtyPageTable.remove(nextRecord.getPageNum().get());
+                    break;
+                case COMMIT_TRANSACTION:
+                    this.transactionTable.get(transNumRecord).transaction.setStatus(Transaction.Status.COMMITTING);
+                    break;
+                case ABORT_TRANSACTION:
+                    this.transactionTable.get(transNumRecord).transaction.setStatus(Transaction.Status.RECOVERY_ABORTING);
+                    break;
+                case END_TRANSACTION:
+                    Transaction transaction = this.transactionTable.get(transNumRecord).transaction;
+                    transaction.cleanup();
+                    transaction.setStatus(Transaction.Status.COMPLETE);
+                    this.transactionTable.remove(transNumRecord); // Not needed actually
+                    endedTransactions.add(transNumRecord);
+                    break;
+            }
+        }
+
+        //All transactions in the COMMITTING state should be ended
+        // (cleanup(), state set to COMPLETE, end transaction record written, and removed from the transaction table).
+        for (Long transNum : this.transactionTable.keySet()){
+            Transaction transaction = this.transactionTable.get(transNum).transaction;
+            long PrevLSN = this.transactionTable.get(transNum).lastLSN;
+            switch (transaction.getStatus()){
+                case COMMITTING:
+                    transaction.cleanup();
+                    transaction.setStatus(Transaction.Status.COMPLETE);
+                    this.transactionTable.remove(transNum);
+                    EndTransactionLogRecord logRecord = new EndTransactionLogRecord(transNum, PrevLSN);
+                    logManager.appendToLog(logRecord);
+                    break;
+                case RUNNING:
+                    transaction.setStatus(Transaction.Status.RECOVERY_ABORTING);
+                    AbortTransactionLogRecord logRecord2 = new AbortTransactionLogRecord(transNum, PrevLSN);
+                    long newLSN = logManager.appendToLog(logRecord2);
+                    this.transactionTable.get(transNum).lastLSN = newLSN;
+                    break;
+            }
+
+
+        }
         return;
     }
 

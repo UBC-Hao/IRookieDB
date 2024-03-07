@@ -726,6 +726,7 @@ public class TestRecoveryManager {
         assertTrue(transactionTable.containsKey(2L));
         assertEquals((long) LSNs.get(6), transactionTable.get(2L).lastLSN);
         assertTrue(transactionTable.containsKey(3L));
+        //assertEquals((long)transactionTable.get(3L).lastLSN ,(long)LSNs.get(7) );
         assertTrue(transactionTable.get(3L).lastLSN > LSNs.get(7));
 
         // DPT after running analysis
