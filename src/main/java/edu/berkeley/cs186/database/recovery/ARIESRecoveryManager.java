@@ -712,7 +712,52 @@ public class ARIESRecoveryManager implements RecoveryManager {
      *   the pageLSN is checked, and the record is redone if needed.
      */
     void restartRedo() {
-        // TODO(proj5): implement
+        // proj5: implement
+        Long minLSN = new Long(-1);
+        for (Long key: dirtyPageTable.keySet()) {
+            Long lsn = dirtyPageTable.get(key);
+            if (minLSN == -1) {
+                minLSN = lsn;
+            }
+            minLSN = Math.min(minLSN, lsn);
+        }
+
+        // empty log
+        if (minLSN == -1)  return;
+
+        Iterator<LogRecord> iter = logManager.scanFrom(minLSN);
+        while(iter.hasNext()){
+            LogRecord nextRecord = iter.next();
+            if (!nextRecord.isRedoable()) continue;
+            switch (nextRecord.getType()){
+                case ALLOC_PART:
+                case UNDO_ALLOC_PART:
+                case FREE_PART:
+                case UNDO_FREE_PART:
+                case ALLOC_PAGE:
+                case UNDO_FREE_PAGE:
+                    nextRecord.redo(this, diskSpaceManager, bufferManager);
+                    break;
+                case UPDATE_PAGE:
+                case UNDO_UPDATE_PAGE:
+                case UNDO_ALLOC_PAGE:
+                case FREE_PAGE:
+                    long recLSN_page = dirtyPageTable.getOrDefault(nextRecord.getPageNum().get(),new Long(-1));
+                    if (recLSN_page == -1) break;
+                    if (nextRecord.getLSN() < recLSN_page) break;
+                    long page_lsn = -1;
+                    Page page = bufferManager.fetchPage(new DummyLockContext(), nextRecord.getPageNum().get());
+                    try{
+                        page_lsn = page.getPageLSN();
+                    } finally {
+                        page.unpin();
+                    }
+                    if (page_lsn >= nextRecord.getLSN()) break;
+                    nextRecord.redo(this, diskSpaceManager, bufferManager);
+                    break;
+            }
+        }
+
         return;
     }
 
@@ -730,7 +775,38 @@ public class ARIESRecoveryManager implements RecoveryManager {
      *   and remove from transaction table.
      */
     void restartUndo() {
-        // TODO(proj5): implement
+        // proj5: implement
+        TreeSet<Long> lsns = new TreeSet<>((a, b) -> (int)(b - a));
+        for (TransactionTableEntry value : transactionTable.values())  lsns.add(value.lastLSN);
+        while (!lsns.isEmpty()) {
+            Iterator<Long> iterator = lsns.iterator();
+            if (iterator.hasNext()) {
+                Long maxElement = iterator.next();
+                iterator.remove();
+
+                LogRecord record = logManager.fetchLogRecord(maxElement);
+                if (record.isUndoable()) {
+                    LogRecord clr = record.undo(transactionTable.get(record.getTransNum().get()).lastLSN);
+                    long newLSN = logManager.appendToLog(clr);
+                    transactionTable.get(record.getTransNum().get()).lastLSN = newLSN;
+                    clr.redo(this, diskSpaceManager, bufferManager);
+                }
+                Long nextLSN = record.getUndoNextLSN().orElse(record.getPrevLSN().get());
+                if (nextLSN != 0)
+                    lsns.add(nextLSN);
+                else{
+                    Transaction transaction = this.transactionTable.get(record.getTransNum().get()).transaction;
+                    transaction.cleanup();
+                    Long transNum = record.getTransNum().get();
+                    Long latestLSN =  this.transactionTable.get(record.getTransNum().get()).lastLSN;
+                    EndTransactionLogRecord logRecord = new EndTransactionLogRecord(transNum,  latestLSN);
+                    long lsn = logManager.appendToLog(logRecord);
+                    this.transactionTable.get(transNum).lastLSN = lsn;
+                    this.transactionTable.get(transNum).transaction.setStatus(Transaction.Status.COMPLETE);
+                    this.transactionTable.remove(transNum);
+                }
+            }
+        }
         return;
     }
 
